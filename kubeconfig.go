@@ -44,7 +44,7 @@ type KubectlContext struct {
 type KubectlConfig struct {
 	Kind           string           `yaml:"kind"`
 	Preference     []string         `yaml:"preference,omitempty"`
-	CurrentContext string   `yaml:"current-context"`
+	CurrentContext string           `yaml:"current-context"`
 	Users          []KubectlUsers   `yaml:"users"`
 	Clusters       []KubectlCluster `yaml:"clusters"`
 	Contexts       []KubectlContext `yaml:"contexts"`
@@ -55,11 +55,11 @@ const (
 	ERROR_KUBE_CONFIG_NOT_FOUND = "cat: /root/.kube/config: No such file or directory"
 )
 
-func GetKubeConfig() *KubectlConfig {
-	cmd := "ssh dev-edge." + kubemaster.Name + " sudo cat /root/.kube/config"
+func GetKubeConfig( prefix string) *KubectlConfig {
+	cmd := "ssh "+prefix+"." + kubemaster.Name + " sudo cat /root/.kube/config"
+	Sugar.Info("Calling: ", cmd)
 	job := *exec.Command("bash", "-c", cmd)
 	//job.Path = "/Users/gec/workspace-gec/deployment/ansible/"
-	job.Env = append(os.Environ(), "optimist")
 	output, err := job.CombinedOutput()
 
 	if err != nil {
@@ -83,12 +83,6 @@ func GetKubeConfig() *KubectlConfig {
 		}
 	}
 
-	err = ioutil.WriteFile("./tmp.yml", []byte(o), 0644)
-	if err != nil {
-		Sugar.Error(err)
-		return nil
-	}
-
 	var conf KubectlConfig
 
 	err = yaml.Unmarshal([]byte(o), &conf)
@@ -107,4 +101,125 @@ func SetKubemaster(servers []*Server) {
 			kubemaster = *s
 		}
 	}
+}
+
+func WriteKubectlConfig(path string, content *KubectlConfig) bool {
+	path, err := ReplacePath(path)
+	if err != nil {
+		return false
+	}
+
+	if FileExists(path) {
+		Sugar.Warn("Backup old kubectl config for cluster: " , content.CurrentContext)
+		err := os.Rename(path, path+".backup")
+		if err != nil {
+			Sugar.Error(err)
+			return false
+		}
+	}
+	Sugar.Debug("Writing KubectlConfig:\n", content)
+	b, err := yaml.Marshal(content)
+
+	_, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		Sugar.Error(err)
+		return false
+	}
+	err = ioutil.WriteFile(path, b, 0644)
+	if err != nil {
+		Sugar.Error(err)
+		return false
+	}
+	return true
+}
+
+func CreateKubeConfig(prefix string, servers []*Server) (string, *KubectlConfig) {
+	SetKubemaster(servers)
+	k8sconfig := GetKubeConfig(prefix)
+	if k8sconfig == nil {
+		Sugar.Error("Error while creating cluster config")
+		return "", nil
+	}
+
+	currentContext := k8sconfig.CurrentContext
+	Sugar.Info("Replacing")
+	if strings.ContainsAny(currentContext, "dev-edge") {
+		currentContext = strings.ReplaceAll(currentContext, "dev-edge", prefix)
+	}
+	currentContext = strings.ReplaceAll(currentContext, "kubernetes-admin@", "")
+	k8sconfig.CurrentContext = currentContext
+	k8sconfig.Contexts[0].Name = currentContext
+	k8sconfig.Contexts[0].Context.Cluster = currentContext
+	k8sconfig.Clusters[0].Name = currentContext
+
+	username := k8sconfig.Contexts[0].Context.User + "-" + prefix
+	k8sconfig.Contexts[0].Context.User = username
+	k8sconfig.Users[0].Name = username
+
+	Sugar.Info(k8sconfig)
+	return k8sconfig.CurrentContext, k8sconfig
+}
+
+func UpdateGlobalConfig(path string, k8sconfig *KubectlConfig) *KubectlConfig{
+	path, err := ReplacePath(path)
+	if err != nil {
+		return nil
+	}
+
+	if FileExists(path) {
+		Sugar.Warn("Backup Global KubectlConfig")
+		err := os.Rename(path, path+".backup")
+		if err != nil {
+			Sugar.Error(err)
+			return nil
+		}
+		path = path+".backup"
+	}
+	var conf KubectlConfig
+
+	Sugar.Debug("Reading path: ", path)
+	content, err := ioutil.ReadFile(path) 
+	if err != nil {
+		Sugar.Error(err)
+		return nil
+	}
+
+	err = yaml.Unmarshal([]byte(content), &conf)
+	if err != nil {
+		Sugar.Error(err)
+		return nil
+	}
+
+	found := false
+	for i, context := range conf.Contexts {
+		if context.Name == k8sconfig.CurrentContext {
+			found = true
+			Sugar.Info("Updating Context")
+			conf.Contexts[i] = k8sconfig.Contexts[0]
+		}
+	}
+
+	for i, cluster := range conf.Clusters {
+		if cluster.Name == k8sconfig.Clusters[0].Name {
+			found = true
+			Sugar.Info("Updating Clusters")
+			conf.Clusters[i] = k8sconfig.Clusters[0]
+		}
+	}
+
+	for i, user:= range conf.Users {
+		if user.Name == k8sconfig.Users[0].Name {
+			found = true
+			Sugar.Info("Updating Clusters")
+			conf.Users[i] = k8sconfig.Users[0]
+		}
+	}
+
+	if !found {
+		Sugar.Info("Appending info")
+		conf.Users = append(conf.Users, k8sconfig.Users[0])
+		conf.Contexts = append(conf.Contexts, k8sconfig.Contexts[0])
+		conf.Clusters = append(conf.Clusters, k8sconfig.Clusters[0])
+	}
+	return &conf
 }

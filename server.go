@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"os"
-	"os/user"
-	"strings"
+"strings"
 )
 
 type Server struct {
@@ -100,7 +99,7 @@ func createSSHConfig(servers []*Server, prefix string) bytes.Buffer {
 	buf.WriteString("\n\tUser awieland")
 	buf.WriteString("\n\tForwardAgent yes")
 	buf.WriteString("\n\tStrictHostKeyChecking no")
-	buf.WriteString("\n\tProxyJump bastion")
+	buf.WriteString("\n\tProxyJump "+prefix+".bastion")
 	buf.WriteString("\n\tIdentityFile ~/.ssh/ansible_user.key")
 	buf.WriteString("\n")
 
@@ -108,7 +107,7 @@ func createSSHConfig(servers []*Server, prefix string) bytes.Buffer {
 	buf.WriteString("\n\tUser awieland")
 	buf.WriteString("\n\tForwardAgent yes")
 	buf.WriteString("\n\tStrictHostKeyChecking no")
-	buf.WriteString("\n\tProxyJump bastion")
+	buf.WriteString("\n\tProxyJump "+prefix+".bastion")
 	buf.WriteString("\n\tIdentityFile ~/.ssh/ansible_user.key")
 	buf.WriteString("\n")
 
@@ -129,28 +128,28 @@ func createSSHConfig(servers []*Server, prefix string) bytes.Buffer {
 			buf.WriteString("\n\tUser ubuntu")
 			buf.WriteString("\n\tIdentityFile ~/.ssh/openstack_innovo-employee-awieland.key")
 			buf.WriteString("\n")
-		} else {
+		} else if strings.Contains(s.Name, "customer-workstation") {
 			buf.WriteString("\nHost "+prefix +"." + s.Name)
 			buf.WriteString("\n\tHostname" + s.IP)
-			buf.WriteString("\n\tUser ubuntu")
+			buf.WriteString("\n\tUser centos")
 			buf.WriteString("\n\tForwardAgent yes")
 			buf.WriteString("\n\tStrictHostKeyChecking no")
 			buf.WriteString("\n\tIdentityFile ~/.ssh/openstack_innovo-employee-awieland.key")
 			buf.WriteString("\n")
+		} else {
+			Sugar.Info("ignoring Server: " + s.Name)
 		}
 	}
 	return buf
 }
 
 func writeSSHConfig(path string, content []byte) bool {
-	usr, err := user.Current()
+	path, err := ReplacePath(path)
 	if err != nil {
-		Sugar.Fatal(err)
 		return false
 	}
 
-	path = strings.ReplaceAll(path, "~", usr.HomeDir)
-	if FileExists(path) {
+		if FileExists(path) {
 		Sugar.Warn("removes old ssh file")
 		err := os.Rename(path, path+".backup")
 		if err != nil {
@@ -167,9 +166,8 @@ func writeSSHConfig(path string, content []byte) bool {
 	return true
 }
 
-func readServers(content []byte, prefix string){
-	split := strings.Split(string(content), "\n")
-	split = split[2:]
+func readServers(content string, prefix string)  ( []byte, []*Server ) {
+	split := strings.Split(content, "\n")
 	var servers []*Server
 	for _,line := range split {
 		s:=handleServer(line)
@@ -177,7 +175,6 @@ func readServers(content []byte, prefix string){
 			servers = append(servers, s )
 		}
 	}
-	Sugar.Info(servers)
 	buffer := createSSHConfig(servers, prefix)
-	writeSSHConfig("./"+prefix+".gecgo.net", buffer.Bytes())
+	return buffer.Bytes(), servers
 }
