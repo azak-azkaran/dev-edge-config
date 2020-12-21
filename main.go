@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -41,8 +43,20 @@ func main (){
 		Sugar.Panic("ERROR while reading config file", err)
 	}
 
-	projects := viper.GetStringMap("project")
+	projects := viper.GetStringMapString("project")
 	pw := viper.GetString("password")
-	Sugar.Info(pw)
-	Sugar.Info(projects)
+	for project , prefix := range projects {
+		Sugar.Info("Project name:", project)
+		Sugar.Info("Project prefix:", prefix)
+		cmd := "openstack server list --os-password="+ pw+ " --os-cloud="+ project
+		job := *exec.Command("/bin/sh", "-c",cmd)
+		job.Env = append(os.Environ(), "OS_CLOUD="+project)
+
+		out,err := job.CombinedOutput()
+		if err != nil {
+			Sugar.Error("Error:" , string( out ), "\n" ,err)
+		}else{
+			readServers(out, prefix)
+		}
+	}
 }

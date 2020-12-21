@@ -93,10 +93,10 @@ func handleServer(line string) *Server {
 	return &server
 }
 
-func createSSHConfig(servers []*Server) bytes.Buffer {
+func createSSHConfig(servers []*Server, prefix string) bytes.Buffer {
 	var buf bytes.Buffer
 
-	buf.WriteString("\nHost dev-edge.switch*")
+	buf.WriteString("\nHost "+prefix+".switch*")
 	buf.WriteString("\n\tUser awieland")
 	buf.WriteString("\n\tForwardAgent yes")
 	buf.WriteString("\n\tStrictHostKeyChecking no")
@@ -104,7 +104,7 @@ func createSSHConfig(servers []*Server) bytes.Buffer {
 	buf.WriteString("\n\tIdentityFile ~/.ssh/ansible_user.key")
 	buf.WriteString("\n")
 
-	buf.WriteString("\nHost dev-edge.server*")
+	buf.WriteString("\nHost "+prefix+".server*")
 	buf.WriteString("\n\tUser awieland")
 	buf.WriteString("\n\tForwardAgent yes")
 	buf.WriteString("\n\tStrictHostKeyChecking no")
@@ -114,22 +114,23 @@ func createSSHConfig(servers []*Server) bytes.Buffer {
 
 	for _, s := range servers {
 		if strings.Contains(s.Name, "server") {
-			buf.WriteString("\nHost dev-edge." + s.Name)
+			buf.WriteString("\nHost "+prefix+"." + s.Name)
 			buf.WriteString("\n\tHostname" + s.IP)
-			buf.WriteString("\n\tProxyCommand ssh dev-edge.switch0 /sbin/ip vrf exec default busybox nc -w 3000 %h %p")
+			buf.WriteString("\n\tProxyCommand ssh "+prefix+".switch0 /sbin/ip vrf exec default busybox nc -w 3000 %h %p")
 			buf.WriteString("\n")
 		} else if strings.Contains(s.Name, "switch") {
-			buf.WriteString("\nHost dev-edge." + s.Name)
+			buf.WriteString("\nHost "+prefix+"." + s.Name)
 			buf.WriteString("\n\tHostname" + s.IP)
 			buf.WriteString("\n")
 		} else if strings.Contains(s.Name, "bastion") {
-			buf.WriteString("\nHost " + s.Name)
+			buf.WriteString("\nHost "+prefix +"."+ s.Name)
 			buf.WriteString("\n\tHostname" + s.IP)
 			buf.WriteString("\n\tStrictHostKeyChecking no")
 			buf.WriteString("\n\tUser ubuntu")
+			buf.WriteString("\n\tIdentityFile ~/.ssh/openstack_innovo-employee-awieland.key")
 			buf.WriteString("\n")
 		} else {
-			buf.WriteString("\nHost " + s.Name)
+			buf.WriteString("\nHost "+prefix +"." + s.Name)
 			buf.WriteString("\n\tHostname" + s.IP)
 			buf.WriteString("\n\tUser ubuntu")
 			buf.WriteString("\n\tForwardAgent yes")
@@ -164,4 +165,19 @@ func writeSSHConfig(path string, content []byte) bool {
 		return false
 	}
 	return true
+}
+
+func readServers(content []byte, prefix string){
+	split := strings.Split(string(content), "\n")
+	split = split[2:]
+	var servers []*Server
+	for _,line := range split {
+		s:=handleServer(line)
+		if s != nil{
+			servers = append(servers, s )
+		}
+	}
+	Sugar.Info(servers)
+	buffer := createSSHConfig(servers, prefix)
+	writeSSHConfig("./"+prefix+".gecgo.net", buffer.Bytes())
 }
