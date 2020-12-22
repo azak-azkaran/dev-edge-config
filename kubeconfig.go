@@ -9,8 +9,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var kubemaster Server
-
 type UserData struct {
 	ClientCertificate string `yaml:"client-certificate-data"`
 	ClientKey         string `yaml:"client-key-data"`
@@ -55,8 +53,8 @@ const (
 	ERROR_KUBE_CONFIG_NOT_FOUND = "cat: /root/.kube/config: No such file or directory"
 )
 
-func GetKubeConfig( prefix string) *KubectlConfig {
-	cmd := "ssh "+prefix+"." + kubemaster.Name + " sudo cat /root/.kube/config"
+func GetKubeConfig(kubemaster string) *KubectlConfig {
+	cmd := "ssh "+ kubemaster+ " sudo cat /root/.kube/config"
 	Sugar.Info("Calling: ", cmd)
 	job := *exec.Command("bash", "-c", cmd)
 	//job.Path = "/Users/gec/workspace-gec/deployment/ansible/"
@@ -94,13 +92,14 @@ func GetKubeConfig( prefix string) *KubectlConfig {
 	return &conf
 }
 
-func SetKubemaster(servers []*Server) {
+func SetKubemaster(servers []*Server) *Server {
 	for _, s := range servers {
 		if strings.Contains(s.Name, "switch0") {
 			Sugar.Info("Setting Kubemaster to: ", s.IP)
-			kubemaster = *s
+			return s
 		}
 	}
+	return nil
 }
 
 func WriteKubectlConfig(path string, content *KubectlConfig) bool {
@@ -133,14 +132,11 @@ func WriteKubectlConfig(path string, content *KubectlConfig) bool {
 	return true
 }
 
-func CreateKubeConfig(prefix string, servers []*Server) (string, *KubectlConfig) {
-	SetKubemaster(servers)
-	k8sconfig := GetKubeConfig(prefix)
+func UpdateKubeConfig(prefix string ,k8sconfig *KubectlConfig) (string, *KubectlConfig){
 	if k8sconfig == nil {
 		Sugar.Error("Error while creating cluster config")
 		return "", nil
 	}
-
 	currentContext := k8sconfig.CurrentContext
 	Sugar.Info("Replacing")
 	if strings.ContainsAny(currentContext, "dev-edge") {
@@ -152,12 +148,26 @@ func CreateKubeConfig(prefix string, servers []*Server) (string, *KubectlConfig)
 	k8sconfig.Contexts[0].Context.Cluster = currentContext
 	k8sconfig.Clusters[0].Name = currentContext
 
-	username := k8sconfig.Contexts[0].Context.User + "-" + prefix
+	var username string
+	if prefix == "" {
+		username = k8sconfig.Contexts[0].Context.User + "-" + currentContext
+	}else{
+		username = k8sconfig.Contexts[0].Context.User + "-" + prefix
+	}
 	k8sconfig.Contexts[0].Context.User = username
 	k8sconfig.Users[0].Name = username
-
-	Sugar.Info(k8sconfig)
 	return k8sconfig.CurrentContext, k8sconfig
+}
+
+func CreateKubeConfig(prefix string, servers []*Server) (string, *KubectlConfig) {
+	kubemaster := SetKubemaster(servers)
+	if kubemaster == nil {
+		Sugar.Error("could not retrieve switch0")
+		return "", nil
+	}
+	k8sconfig := GetKubeConfig(prefix+"." + kubemaster.Name)
+	
+	return UpdateKubeConfig(prefix, k8sconfig)
 }
 
 func UpdateGlobalConfig(path string, k8sconfig *KubectlConfig) *KubectlConfig{

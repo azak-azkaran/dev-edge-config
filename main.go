@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,10 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+)
+const (
+	MODE_OPENSTACK = "openstack"
+	MODE_KUBERNETES = "k8s"
 )
 
 var (
@@ -30,16 +35,16 @@ func LogInit() *zap.SugaredLogger {
 	return logger.Sugar()
 }
 
-func main() {
-	viper.SetConfigName("config.secret")
+func FetchOpenstackInfo()  error{
+viper.SetConfigName("config.secret")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("~/")
 	viper.AddConfigPath("./")
-	//viper.SetConfigFile("./config.secret.yaml")
 
 	err := viper.ReadInConfig()
 	if err != nil {
 		Sugar.Panic("ERROR while reading config file", err)
+		return err
 	}
 
 	projects := viper.GetStringMapString("project")
@@ -58,6 +63,38 @@ func main() {
 			CreateConfigs("~/.ssh/config.d/"+prefix+".gecgo.net", string(out), prefix)
 		}
 	}
+	return nil
+}
+
+func FetchK8sInfo(ssh string){
+	if ssh == "" {
+		Sugar.Error("Error: url was not defined",)
+		return
+	}
+
+	Sugar.Info("Fetchin kubectl config from server: ", ssh)
+	clustername, k8sconfig := UpdateKubeConfig("", GetKubeConfig(ssh))
+	
+	WriteKubectlConfig("~/.kube/config.d/"+clustername, k8sconfig)
+
+	conf := UpdateGlobalConfig("~/.kube/config", k8sconfig)
+	WriteKubectlConfig("~/.kube/config", conf)
+}
+
+func main() {
+	mode := flag.String("mode",MODE_OPENSTACK,"defines the mode in which to run ( default: openstack) ")
+	sshurl := flag.String("url", "", "defines the url from which to get the k8s config, only used in k8s mode")
+	flag.Parse()
+	Sugar.Info("Mode: ", *mode)
+	if strings.EqualFold(*mode, MODE_OPENSTACK){
+		FetchOpenstackInfo()
+	}else if strings.EqualFold(*mode, MODE_KUBERNETES) {
+		FetchK8sInfo(*sshurl)
+	} else{
+		Sugar.Panic("Unknown mode, Dying Horribly")
+		return
+	}
+	Sugar.Info("Happy Death")
 }
 
 func CreateConfigs(path string, table string, prefix string) {
