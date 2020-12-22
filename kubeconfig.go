@@ -198,7 +198,12 @@ func UpdateGlobalConfig(path string, k8sconfig *KubectlConfig) *KubectlConfig{
 			conf.Contexts[i] = k8sconfig.Contexts[0]
 		}
 	}
+	if !found {
+		Sugar.Info("Appending Context information")
+		conf.Contexts = append(conf.Contexts, k8sconfig.Contexts[0])
+	}
 
+	found = false
 	for i, cluster := range conf.Clusters {
 		if cluster.Name == k8sconfig.Clusters[0].Name {
 			found = true
@@ -206,7 +211,12 @@ func UpdateGlobalConfig(path string, k8sconfig *KubectlConfig) *KubectlConfig{
 			conf.Clusters[i] = k8sconfig.Clusters[0]
 		}
 	}
+	if !found {
+		Sugar.Info("Appending Cluster information")
+		conf.Clusters = append(conf.Clusters, k8sconfig.Clusters[0])
+	}
 
+	found = false
 	for i, user:= range conf.Users {
 		if user.Name == k8sconfig.Users[0].Name {
 			found = true
@@ -216,10 +226,8 @@ func UpdateGlobalConfig(path string, k8sconfig *KubectlConfig) *KubectlConfig{
 	}
 
 	if !found {
-		Sugar.Info("Appending info")
+		Sugar.Info("Appending User Information")
 		conf.Users = append(conf.Users, k8sconfig.Users[0])
-		conf.Contexts = append(conf.Contexts, k8sconfig.Contexts[0])
-		conf.Clusters = append(conf.Clusters, k8sconfig.Clusters[0])
 	}
 	return &conf
 }
