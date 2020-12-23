@@ -4,18 +4,8 @@ all: install
 fetch:
 	go mod download
 
-install: fetch
-	@echo Installing to ${GOPATH}/bin
-	go install -v
-
-run:
-	@echo Running agent
-	go build -v
-	agent
-
 test: fetch
 	@echo Running tests
-	export RUN_MOCK=true
 	go test -v
 
 coverage: fetch
