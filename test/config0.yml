@@ -1,0 +1,17 @@
+kind: Config
+current-context: dev-edge.net
+users:
+- name: kubernetes-admin-dev-edge
+  user:
+    client-certificate-data: client-certificate-data-very-secret
+    client-key-data: client-data-very-secret
+clusters:
+- cluster:
+    certificate-authority-data: certificate-authority-data-very-secret
+    server: https://server.ip:6443
+  name: dev-edge.net
+contexts:
+- name: dev-edge.net
+  context:
+    cluster: dev-edge.net
+    user: kubernetes-admin-dev-edge
