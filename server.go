@@ -125,7 +125,7 @@ func createSSHConfig(servers []*Server, prefix string) bytes.Buffer {
 			buf.WriteString("\nHost "+prefix +"."+ s.Name)
 			buf.WriteString("\n\tHostname" + s.IP)
 			buf.WriteString("\n\tStrictHostKeyChecking no")
-			buf.WriteString("\n\tUser ubuntu")
+			buf.WriteString("\n\tUser awieland")
 			buf.WriteString("\n\tIdentityFile ~/.ssh/openstack_innovo-employee-awieland.key")
 			buf.WriteString("\n")
 		} else if strings.Contains(s.Name, "customer-workstation") {
