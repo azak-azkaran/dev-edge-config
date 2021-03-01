@@ -166,6 +166,9 @@ func CreateKubeConfig(prefix string, servers []*Server) (string, *KubectlConfig)
 		return "", nil
 	}
 	k8sconfig := GetKubeConfig(prefix+"." + kubemaster.Name)
+	if k8sconfig == nil {
+		return "", nil
+	}
 	
 	return UpdateKubeConfig(prefix, k8sconfig)
 }
