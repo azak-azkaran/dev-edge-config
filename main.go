@@ -106,6 +106,9 @@ func CreateConfigs(path string, table string, prefix string) {
 	writeSSHConfig(path, buffer)
 
 	clustername, k8sconfig := CreateKubeConfig(prefix, servers)
+	if k8sconfig == nil{
+		return
+	}
 	WriteKubectlConfig("~/.kube/config.d/"+clustername, k8sconfig)
 
 	conf := UpdateGlobalConfig("~/.kube/config", k8sconfig)
