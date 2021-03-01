@@ -17,3 +17,7 @@ coverage: fetch
 coverall: coverage
 	@echo Running Test with Coverall
 	goveralls -coverprofile=cover.out -service=travis-ci -repotoken=${COVERALLS_TOKEN }
+
+install: fetch
+	@echo Installing package
+	go install
