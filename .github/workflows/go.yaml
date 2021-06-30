@@ -54,5 +54,5 @@ jobs:
     - name: Send coverage
       env:
         COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: goveralls -coverprofile=cover.out -service="github"
+      run: make coverall
       working-directory: src/github.com/azak-azkaran/k8s-config

@@ -11,13 +11,13 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func CleanUp(){
+func CleanUpKubernetesTest() {
 	os.Rename("./test/config1.yml.backup", "./test/config1.yml")
 	os.Rename("./test/config2.yml.backup", "./test/config2.yml")
 }
 
 func TestUpdateGlobalConfig(t *testing.T) {
-	t.Cleanup(CleanUp)
+	t.Cleanup(CleanUpKubernetesTest)
 	LogConfig.Level.SetLevel(zap.DebugLevel)
 	Sugar.Info("Test: UpdateGlobalConfig")
 
@@ -32,20 +32,19 @@ func TestUpdateGlobalConfig(t *testing.T) {
 	require.NotEmpty(t, conf)
 
 	added := false
-	for _, context := range conf.Contexts{
-		if context.Name == k8sconfig.CurrentContext{
+	for _, context := range conf.Contexts {
+		if context.Name == k8sconfig.CurrentContext {
 			added = true
 		}
 	}
 	assert.True(t, added)
 
-
 	conf = UpdateGlobalConfig("./test/config2.yml", &k8sconfig)
 	require.NotEmpty(t, conf)
 
 	changed := false
-	for _, context := range conf.Contexts{
-		if context.Name == k8sconfig.CurrentContext && context.Context.User == k8sconfig.Contexts[0].Context.User{
+	for _, context := range conf.Contexts {
+		if context.Name == k8sconfig.CurrentContext && context.Context.User == k8sconfig.Contexts[0].Context.User {
 			changed = true
 		}
 	}

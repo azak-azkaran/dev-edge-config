@@ -1,4 +1,4 @@
-module github.com/azak-azkaran/dev-edge-config
+module github.com/azak-azkaran/k8s-config
 
 go 1.15
 
